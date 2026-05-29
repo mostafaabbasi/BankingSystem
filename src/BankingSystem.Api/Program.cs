@@ -1,41 +1,102 @@
-var builder = WebApplication.CreateBuilder(args);
+using System.Reflection;
+using BankingSystem.Api.Common;
+using BankingSystem.Application;
+using BankingSystem.Infrastructure;
+using Elastic.Serilog.Sinks;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using RabbitMQ.Client;
+using Scalar.AspNetCore;
+using Serilog;
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+try
 {
-    app.MapOpenApi();
-}
+    var builder = WebApplication.CreateBuilder(args);
 
-app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
+    builder.Host.UseSerilog((ctx, services, cfg) =>
     {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast");
+        var elasticsearchUrl = ctx.Configuration["Elasticsearch:Url"] ?? "http://localhost:9200";
 
-app.Run();
+        cfg.ReadFrom.Configuration(ctx.Configuration)
+            .ReadFrom.Services(services)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("Application", "BankingSystem")
+            .WriteTo.Console()
+            .WriteTo.Elasticsearch([new Uri(elasticsearchUrl)]);
+    });
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
+
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("BankingSystem"))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddEntityFrameworkCoreInstrumentation()
+            .AddSource("MassTransit")
+            .AddZipkinExporter(o =>
+                o.Endpoint = new Uri(
+                    builder.Configuration["Zipkin:Endpoint"] ?? "http://localhost:9411/api/v2/spans")))
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddProcessInstrumentation()
+            .AddPrometheusExporter());
+
+    builder.Services.AddOpenApi();
+
+    builder.Services.AddAuthentication();
+    builder.Services.AddAuthorization();
+    builder.Services.AddEndpoints(Assembly.GetExecutingAssembly());
+
+    builder.Services.AddHealthChecks()
+        .AddNpgSql(builder.Configuration.GetConnectionString("Postgres")!)
+        .AddRedis(builder.Configuration.GetConnectionString("Redis")!)
+        .AddRabbitMQ(sp =>
+        {
+            var factory = new ConnectionFactory
+            {
+                Uri = new Uri(
+                    $"amqp://{builder.Configuration["RabbitMq:Username"]}:{builder.Configuration["RabbitMq:Password"]}@{builder.Configuration["RabbitMq:Host"]}/")
+            };
+            return factory.CreateConnectionAsync();
+        });
+
+    var app = builder.Build();
+
+    app.UseSerilogRequestLogging();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+        app.MapScalarApiReference();
+        await app.Services.MigrateDatabaseAsync();
+    }
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.MapEndpoints();
+    app.MapHealthChecks("/health");
+    app.MapPrometheusScrapingEndpoint("/metrics");
+
+    app.Run();
 }
+catch (Exception ex) when (ex is not HostAbortedException)
+{
+    Log.Fatal(ex, "Application startup failed.");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
+
+public partial class Program;

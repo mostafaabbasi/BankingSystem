@@ -58,7 +58,8 @@ public static class DependencyInjection
 
             bus.UsingRabbitMq((ctx, cfg) =>
             {
-                cfg.Host(configuration["RabbitMq:Host"], configuration["RabbitMq:VHost"], h =>
+                var port = ushort.TryParse(configuration["RabbitMq:Port"], out var p) ? p : (ushort)5672;
+                cfg.Host(configuration["RabbitMq:Host"], port, configuration["RabbitMq:VHost"], h =>
                 {
                     h.Username(configuration["RabbitMq:Username"]!);
                     h.Password(configuration["RabbitMq:Password"]!);

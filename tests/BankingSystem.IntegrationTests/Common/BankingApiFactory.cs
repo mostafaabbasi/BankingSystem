@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
 using Testcontainers.Redis;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace BankingSystem.IntegrationTests.Common;
@@ -26,6 +27,8 @@ public sealed class BankingApiFactory : WebApplicationFactory<Program>, IAsyncLi
 
     private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()
         .WithImage("rabbitmq:4.3.0-management")
+        .WithUsername("banking_test")
+        .WithPassword("banking_test")
         .Build();
 
     public HttpClient Client { get; private set; } = default!;
@@ -37,7 +40,20 @@ public sealed class BankingApiFactory : WebApplicationFactory<Program>, IAsyncLi
             _redis.StartAsync(),
             _rabbitMq.StartAsync());
 
+        await RunMigrationsAsync();
+
         Client = CreateClient();
+    }
+
+    private async Task RunMigrationsAsync()
+    {
+        var options = new DbContextOptionsBuilder<BankingDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString())
+            .UseSnakeCaseNamingConvention()
+            .Options;
+
+        await using var db = new BankingDbContext(options, NullLogger<BankingDbContext>.Instance);
+        await db.Database.MigrateAsync();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -56,24 +72,25 @@ public sealed class BankingApiFactory : WebApplicationFactory<Program>, IAsyncLi
             services.Configure<Microsoft.Extensions.Options.IOptions<object>>(_ => { });
         });
 
+        var rabbitUri = new Uri(_rabbitMq.GetConnectionString());
+        var rabbitCredentials = rabbitUri.UserInfo.Split(':');
         builder.UseSetting("ConnectionStrings:Postgres", _postgres.GetConnectionString());
         builder.UseSetting("ConnectionStrings:Redis", _redis.GetConnectionString());
-        builder.UseSetting("RabbitMq:Host", new Uri(_rabbitMq.GetConnectionString()).Host);
-        builder.UseSetting("RabbitMq:Username", "guest");
-        builder.UseSetting("RabbitMq:Password", "guest");
+        builder.UseSetting("RabbitMq:Host", rabbitUri.Host);
+        builder.UseSetting("RabbitMq:Port", rabbitUri.Port.ToString());
+        builder.UseSetting("RabbitMq:Username", rabbitCredentials[0]);
+        builder.UseSetting("RabbitMq:Password", rabbitCredentials[1]);
     }
 
-    public async Task<BankingDbContext> GetDbContextAsync()
+    public BankingDbContext GetDbContext()
     {
         var scope = Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<BankingDbContext>();
-        await db.Database.MigrateAsync();
-        return db;
+        return scope.ServiceProvider.GetRequiredService<BankingDbContext>();
     }
 
     public async Task ResetDatabaseAsync()
     {
-        var db = await GetDbContextAsync();
+        var db = GetDbContext();
         await db.Database.ExecuteSqlRawAsync(
             "TRUNCATE TABLE transactions, accounts, outbox_messages RESTART IDENTITY CASCADE");
     }

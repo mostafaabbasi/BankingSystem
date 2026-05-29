@@ -25,7 +25,7 @@ jobs:
         run: dotnet build BankingSystem.sln --no-restore --configuration Release
 
       - name: Unit Tests
-        run: dotnet test tests/BankingSystem.UnitTests --no-build --configuration Release --logger "github;verbosity=summary"
+        run: dotnet test tests/BankingSystem.UnitTests --no-build --configuration Release --verbosity normal
 
       - name: Integration Tests
-        run: dotnet test tests/BankingSystem.IntegrationTests --no-build --configuration Release --logger "github;verbosity=summary"
+        run: dotnet test tests/BankingSystem.IntegrationTests --no-build --configuration Release --verbosity normal

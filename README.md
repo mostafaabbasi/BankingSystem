@@ -387,6 +387,18 @@ Unit tests run as a **build gate** inside Docker. If any test fails the image is
 
 ---
 
+## CI
+
+GitHub Actions runs on every push and pull request to `main`:
+
+```
+restore → build (Release) → unit tests → integration tests
+```
+
+Integration tests use Testcontainers — the `ubuntu-latest` runner has Docker available so no extra setup is needed.
+
+---
+
 ## Running Tests
 
 ### Unit Tests

@@ -91,7 +91,21 @@ public sealed class TransferHandler(
 
         var transaction = transactionResult.Value;
         await transactionRepository.AddAsync(transaction, ct);
-        await unitOfWork.SaveChangesAsync(ct);
+
+        try
+        {
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+        catch (DuplicateKeyException)
+        {
+            var existing = await transactionRepository.GetByIdempotencyKeyAsync(command.IdempotencyKey, ct);
+            if (existing.IsSuccess)
+            {
+                var t = existing.Value;
+                return new TransferResponse(t.Id, t.Status.ToString(), t.CorrelationId, t.CreatedAt);
+            }
+            return Error.Business("Transfer.Conflict", "A concurrent transfer with the same key is being processed.");
+        }
 
         await idempotencyService.MarkAsProcessedAsync(
             command.IdempotencyKey, transaction.Id.ToString(), TimeSpan.FromDays(7), ct);

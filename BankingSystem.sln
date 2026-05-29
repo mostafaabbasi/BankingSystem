@@ -6,8 +6,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{E4A1C9EC
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9DCAF9B6-2111-4519-80EF-432FEC6879F8}"
 ProjectSection(SolutionItems) = preProject
-		.gitignore = .gitignore
-		Directory.Packages.props = Directory.Packages.props
+		        .gitignore = .gitignore
+        		Directory.Packages.props = Directory.Packages.props
+        		docker-compose.yml = docker-compose.yml
+        		README.md = README.md
+        		grafana\provisioning\datasources\datasources.yaml = grafana\provisioning\datasources\datasources.yaml
+        		grafana\provisioning\dashboards\dashboards.yaml = grafana\provisioning\dashboards\dashboards.yaml
+        		prometheus\prometheus.yml = prometheus\prometheus.yml
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BankingSystem.Api", "src\BankingSystem.Api\BankingSystem.Api.csproj", "{A5A304E6-1834-4B59-8BAF-B8F79056DC6B}"

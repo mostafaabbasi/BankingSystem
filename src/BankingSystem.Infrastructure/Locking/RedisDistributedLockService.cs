@@ -8,6 +8,9 @@ public sealed class RedisDistributedLockService(
     IConnectionMultiplexer redis,
     ILogger<RedisDistributedLockService> logger) : IDistributedLockService
 {
+    private const int MaxRetries = 10;
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(100);
+
     public async Task<IAsyncDisposable?> AcquireLockAsync(
         string resource,
         TimeSpan expiry,
@@ -17,20 +20,20 @@ public sealed class RedisDistributedLockService(
         var lockToken = Guid.NewGuid().ToString();
         var lockKey = $"lock:{resource}";
 
-        var acquired = await db.StringSetAsync(
-            lockKey,
-            lockToken,
-            expiry,
-            When.NotExists);
-
-        if (!acquired)
+        for (int i = 0; i < MaxRetries; i++)
         {
-            logger.LogWarning("Failed to acquire lock on resource: {Resource}", resource);
-            return null;
+            var acquired = await db.StringSetAsync(lockKey, lockToken, expiry, When.NotExists);
+            if (acquired)
+            {
+                logger.LogDebug("Acquired lock on: {Resource}", resource);
+                return new RedisLock(db, lockKey, lockToken, logger);
+            }
+
+            await Task.Delay(RetryDelay, ct);
         }
 
-        logger.LogDebug("Acquired lock on: {Resource}", resource);
-        return new RedisLock(db, lockKey, lockToken, logger);
+        logger.LogWarning("Failed to acquire lock on resource: {Resource}", resource);
+        return null;
     }
 
     private sealed class RedisLock(

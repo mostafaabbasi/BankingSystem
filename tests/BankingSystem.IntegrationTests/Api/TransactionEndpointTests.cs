@@ -59,7 +59,7 @@ public sealed class TransactionEndpointTests(BankingApiFactory factory)
         request.Headers.Add("Idempotency-Key", key);
         var response = await Client.SendAsync(request);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
     [Fact]

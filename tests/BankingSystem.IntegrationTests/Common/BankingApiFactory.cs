@@ -14,18 +14,18 @@ namespace BankingSystem.IntegrationTests.Common;
 public sealed class BankingApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:17-alpine")
+        .WithImage("postgres:latest")
         .WithDatabase("banking_test")
         .WithUsername("test_user")
         .WithPassword("test_pass")
         .Build();
 
     private readonly RedisContainer _redis = new RedisBuilder()
-        .WithImage("redis:7-alpine")
+        .WithImage("redis:latest")
         .Build();
 
     private readonly RabbitMqContainer _rabbitMq = new RabbitMqBuilder()
-        .WithImage("rabbitmq:4-management-alpine")
+        .WithImage("rabbitmq:4.3.0-management")
         .Build();
 
     public HttpClient Client { get; private set; } = default!;
@@ -74,9 +74,8 @@ public sealed class BankingApiFactory : WebApplicationFactory<Program>, IAsyncLi
     public async Task ResetDatabaseAsync()
     {
         var db = await GetDbContextAsync();
-        db.Transactions.RemoveRange(db.Transactions);
-        db.Accounts.RemoveRange(db.Accounts);
-        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlRawAsync(
+            "TRUNCATE TABLE transactions, accounts, outbox_messages RESTART IDENTITY CASCADE");
     }
 
     async Task IAsyncLifetime.DisposeAsync()

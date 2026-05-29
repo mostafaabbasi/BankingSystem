@@ -97,7 +97,10 @@ public sealed class OutboxIntegrationTests(BankingApiFactory factory)
         {
             await Task.Delay(TimeSpan.FromMilliseconds(500));
 
-            var messages = await db.OutboxMessages
+            var freshDb = factory.Services.CreateScope().ServiceProvider
+                .GetRequiredService<BankingDbContext>();
+
+            var messages = await freshDb.OutboxMessages
                 .Where(m => m.Type.Contains(nameof(AccountCreatedEvent)))
                 .ToListAsync();
 

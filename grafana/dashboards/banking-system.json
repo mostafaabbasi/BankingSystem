@@ -1,0 +1,172 @@
+{
+  "title": "Banking System",
+  "uid": "banking-system",
+  "tags": ["banking", "dotnet"],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "graphTooltip": 1,
+  "panels": [
+
+    { "type": "row", "id": 1, "title": "HTTP Traffic", "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }, "collapsed": false },
+
+    {
+      "type": "stat", "id": 2, "title": "Request Rate",
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "reqps", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":10},{"color":"red","value":50}] } } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(http_server_request_duration_seconds_count[1m]))", "legendFormat": "req/s" }]
+    },
+
+    {
+      "type": "stat", "id": 3, "title": "Error Rate",
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":1},{"color":"red","value":5}] } } },
+      "targets": [{ "refId": "A", "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[1m])) / sum(rate(http_server_request_duration_seconds_count[1m])) * 100 or vector(0)", "legendFormat": "error %" }]
+    },
+
+    {
+      "type": "stat", "id": 4, "title": "P95 Latency",
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":0.5},{"color":"red","value":2}] } } },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by(le) (rate(http_server_request_duration_seconds_bucket[5m])))", "legendFormat": "p95" }]
+    },
+
+    {
+      "type": "stat", "id": 5, "title": "Active Requests",
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":50},{"color":"red","value":200}] } } },
+      "targets": [{ "refId": "A", "expr": "sum(http_server_active_requests) or vector(0)", "legendFormat": "active" }]
+    },
+
+    {
+      "type": "timeseries", "id": 6, "title": "Request Rate by Route",
+      "gridPos": { "x": 0, "y": 5, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [{ "refId": "A", "expr": "sum by(http_route, http_request_method) (rate(http_server_request_duration_seconds_count[1m]))", "legendFormat": "{{http_request_method}} {{http_route}}" }]
+    },
+
+    {
+      "type": "timeseries", "id": 7, "title": "Latency Percentiles",
+      "gridPos": { "x": 12, "y": 5, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.50, sum by(le) (rate(http_server_request_duration_seconds_bucket[5m])))", "legendFormat": "p50" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by(le) (rate(http_server_request_duration_seconds_bucket[5m])))", "legendFormat": "p95" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by(le) (rate(http_server_request_duration_seconds_bucket[5m])))", "legendFormat": "p99" }
+      ]
+    },
+
+    { "type": "row", "id": 8, "title": "Process Resources", "gridPos": { "x": 0, "y": 13, "w": 24, "h": 1 }, "collapsed": false },
+
+    {
+      "type": "stat", "id": 17, "title": "CPU Usage",
+      "gridPos": { "x": 0, "y": 14, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "percent", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":70},{"color":"red","value":90}] } } },
+      "targets": [{ "refId": "A", "expr": "rate(dotnet_process_cpu_time_seconds_total[1m]) * 100", "legendFormat": "cpu %" }]
+    },
+
+    {
+      "type": "stat", "id": 18, "title": "Process Memory",
+      "gridPos": { "x": 6, "y": 14, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "bytes", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":500000000},{"color":"red","value":1000000000}] } } },
+      "targets": [{ "refId": "A", "expr": "dotnet_process_memory_working_set_bytes", "legendFormat": "working set" }]
+    },
+
+    {
+      "type": "stat", "id": 19, "title": "Thread Pool Threads",
+      "gridPos": { "x": 12, "y": 14, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":20},{"color":"red","value":50}] } } },
+      "targets": [{ "refId": "A", "expr": "dotnet_thread_pool_thread_count_total", "legendFormat": "pool threads" }]
+    },
+
+    {
+      "type": "stat", "id": 20, "title": "Exceptions / sec",
+      "gridPos": { "x": 18, "y": 14, "w": 6, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "unit": "ops", "color": { "mode": "thresholds" }, "thresholds": { "steps": [{"color":"green","value":null},{"color":"yellow","value":1},{"color":"red","value":10}] } } },
+      "targets": [{ "refId": "A", "expr": "rate(dotnet_exceptions_total[1m])", "legendFormat": "exceptions/s" }]
+    },
+
+    {
+      "type": "timeseries", "id": 21, "title": "CPU Over Time",
+      "gridPos": { "x": 0, "y": 18, "w": 8, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [{ "refId": "A", "expr": "rate(dotnet_process_cpu_time_seconds_total[1m]) * 100", "legendFormat": "cpu %" }]
+    },
+
+    {
+      "type": "timeseries", "id": 22, "title": "Memory Over Time",
+      "gridPos": { "x": 8, "y": 18, "w": 8, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "expr": "dotnet_process_memory_working_set_bytes", "legendFormat": "working set" },
+        { "refId": "B", "expr": "dotnet_gc_last_collection_heap_size_bytes", "legendFormat": "gc heap" }
+      ]
+    },
+
+    {
+      "type": "timeseries", "id": 23, "title": "Thread Pool Over Time",
+      "gridPos": { "x": 16, "y": 18, "w": 8, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "refId": "A", "expr": "dotnet_thread_pool_thread_count_total", "legendFormat": "threads" },
+        { "refId": "B", "expr": "dotnet_thread_pool_queue_length_total", "legendFormat": "queue" }
+      ]
+    },
+
+    { "type": "row", "id": 9, "title": ".NET GC", "gridPos": { "x": 0, "y": 25, "w": 24, "h": 1 }, "collapsed": false },
+
+    {
+      "type": "timeseries", "id": 10, "title": "GC Heap Size",
+      "gridPos": { "x": 0, "y": 26, "w": 8, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [{ "refId": "A", "expr": "dotnet_gc_last_collection_heap_size_bytes", "legendFormat": "heap" }]
+    },
+
+    {
+      "type": "timeseries", "id": 11, "title": "GC Collections / sec",
+      "gridPos": { "x": 8, "y": 26, "w": 8, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [{ "refId": "A", "expr": "rate(dotnet_gc_collections_total[1m])", "legendFormat": "gen {{generation}}" }]
+    },
+
+    {
+      "type": "timeseries", "id": 24, "title": "GC Allocated Bytes / sec",
+      "gridPos": { "x": 16, "y": 26, "w": 8, "h": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [{ "refId": "A", "expr": "rate(dotnet_gc_heap_total_allocated_bytes_total[1m])", "legendFormat": "alloc/s" }]
+    }
+
+  ]
+}
